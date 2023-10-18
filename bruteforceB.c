@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
 
     double start_time, end_time;
 
-    long known_key = 0x0000000000000042;
+    long known_key = 123456L;
 
 
     if (rank == 0) {
