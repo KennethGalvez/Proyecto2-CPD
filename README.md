@@ -15,6 +15,10 @@ sudo apt-get update
 sudo apt-get install libssl-dev
 ```
 
+```bash
+sudo apt install openssl
+```
+
 \*Asegurarse que la red no bloqueé la descarga de paquetes. 
 
 ## Actualización de script en función de la librería
