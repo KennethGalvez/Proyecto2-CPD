@@ -41,9 +41,14 @@ int main(int argc, char *argv[]) {
     unsigned char cipher_text[256]; 
     long file_size = 0;
 
+    double start_time, end_time;
+
     long known_key = 0x0000000000000042;
 
+
     if (rank == 0) {
+        start_time = MPI_Wtime();
+
         if (argc != 4) {
             printf("Uso: %s <archivo_entrada.txt> <potencia_de_2> <archivo_salida.txt>\n", argv[0]);
             MPI_Abort(MPI_COMM_WORLD, 1);
@@ -76,7 +81,7 @@ int main(int argc, char *argv[]) {
 
     char search[] = "es una"; 
 
-    long upper = (1L << atoi(argv[2])); 
+    long upper =(1L << 20); //(1L << atoi(argv[2])); 
     long range_per_node = upper / size;
     long mylower = range_per_node * rank;
     long myupper = range_per_node * (rank + 1) - 1;
@@ -93,6 +98,11 @@ int main(int argc, char *argv[]) {
             printf("Proceso %d con clave %lx encontró el texto descifrado correcto:\n%s\n", rank, key, decrypted_text);
             break; 
         }
+    }
+
+    if (rank == 0) {
+        end_time = MPI_Wtime();
+        printf("Tiempo total para descifrar: %f segundos\n", end_time - start_time);
     }
 
     MPI_Finalize();
