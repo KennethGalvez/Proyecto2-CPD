@@ -37,26 +37,24 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    char *input_file = NULL;
-    unsigned char cipher_text[256]; 
-    long file_size = 0;
+    if (argc != 4) {
+        printf("Uso: %s <archivo_entrada.txt> <archivo_salida.txt> <limite_superior>\n", argv[0]);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
 
+    long upper_limit = atol(argv[3]);
+    char *input_file = NULL;
+    unsigned char cipher_text[256];
+    long file_size = 0;
     double start_time, end_time;
 
-    long known_key = 123456L;
-
+    long known_key = 18014398509481983L;
 
     if (rank == 0) {
         start_time = MPI_Wtime();
 
-        if (argc != 4) {
-            printf("Uso: %s <archivo_entrada.txt> <potencia_de_2> <archivo_salida.txt>\n", argv[0]);
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
-
         input_file = argv[1];
-        int power_of_two = atoi(argv[2]);
-
+        
         FILE *input_fp = fopen(input_file, "rb");
         if (!input_fp) {
             perror("No se pudo abrir el archivo de entrada");
@@ -71,7 +69,6 @@ int main(int argc, char *argv[]) {
         fread(plain_text, 1, file_size, input_fp);
         fclose(input_fp);
 
-        // Encriptar el texto usando la clave conocida
         encrypt(known_key, plain_text, file_size);
         memcpy(cipher_text, plain_text, file_size);
     }
@@ -79,32 +76,34 @@ int main(int argc, char *argv[]) {
     MPI_Bcast(&file_size, 1, MPI_LONG, 0, MPI_COMM_WORLD);
     MPI_Bcast(cipher_text, file_size, MPI_CHAR, 0, MPI_COMM_WORLD);
 
-    char search[] = "es una"; 
+    char search[] = "es una";
+    int found = 0;  // Variable para verificar si se encontró la clave.
 
-    long upper =(1L << 20); //(1L << atoi(argv[2])); 
-    long range_per_node = upper / size;
-    long mylower = range_per_node * rank;
-    long myupper = range_per_node * (rank + 1) - 1;
-    if (rank == size - 1) {
-        myupper = upper;
-    }
+    double found_time = -1.0;  // Usado para marcar el tiempo en que se encontró la solución. -1 indica que no se ha encontrado.
 
-    for (long key = mylower; key <= myupper; key++) {
+
+
+    for (long key = rank; key < upper_limit && !found; key += size) {
         unsigned char decrypted_text[file_size];
         memcpy(decrypted_text, cipher_text, file_size);
         decrypt(key, decrypted_text, file_size);
 
         if (strstr((char *)decrypted_text, search) != NULL) {
             printf("Proceso %d con clave %lx encontró el texto descifrado correcto:\n%s\n", rank, key, decrypted_text);
-            break; 
+            found = 1;
+            found_time = MPI_Wtime();  // Marcar el tiempo en que se encontró la solución
         }
     }
 
-    if (rank == 0) {
-        end_time = MPI_Wtime();
-        printf("Tiempo total para descifrar: %f segundos\n", end_time - start_time);
-    }
+    int global_found = 0;  // Variable para consolidar si algún proceso encontró la clave.
+    double min_found_time = -1.0;  // Inicializar a -1.0
 
+    MPI_Reduce(&found, &global_found, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&found_time, &min_found_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);  // Cambiar a MPI_MAX
+
+    if (rank == 0 && global_found) {
+        printf("Tiempo total para descifrar: %f segundos\n", min_found_time - start_time);
+    }
     MPI_Finalize();
     return 0;
 }
